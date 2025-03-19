@@ -29,7 +29,7 @@ where repeat each Upstream: AsyncSequence & Sendable, repeat (each Upstream).Ele
     }
     
     private func obvserve<Sequence>(sequence: Sequence, at index: Int) -> TaskCancellable where Sequence: AsyncSequence & Sendable, Sequence.Element: Sendable {
-        sequence.sink(cancellation: .automatic) { [weak self] value in
+        sequence.sink { [weak self] value in
             self?.perform(with: value, index: index)
         }
     }

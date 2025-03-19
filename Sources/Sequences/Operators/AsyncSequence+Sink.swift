@@ -15,7 +15,7 @@ public actor SinkActor {
 extension AsyncSequence where Self: Sendable {
     @discardableResult
     public func sink(
-        cancellation: TaskCancellable.Mode,
+        cancellation: TaskCancellable.Mode = .automatic,
         @_inheritActorContext work: @Sendable @escaping @isolated(any) (Element) async -> Void
     ) -> TaskCancellable
     where Element: Sendable {
@@ -24,8 +24,8 @@ extension AsyncSequence where Self: Sendable {
     
     @discardableResult
     func sink(
-        number: Int = 0,
-        cancellation: TaskCancellable.Mode,
+        identifier: Int = 0,
+        cancellation: TaskCancellable.Mode = .automatic,
         @_inheritActorContext work: @Sendable @escaping @isolated(any) (Element) async -> Void,
         registration: (@Sendable (Int) -> Void)?
     ) -> TaskCancellable
@@ -44,7 +44,7 @@ extension AsyncSequence where Self: Sendable {
             //
             // This is crucial for scenarios like video or audio processing, where frames arriving
             // out of order would lead to corruption.
-            registration?(number)
+            registration?(identifier)
 
             for try await element in self {
                 await work(element)

@@ -17,9 +17,9 @@ where Upstream: AsyncSequence & Sendable, Upstream.Element: AsyncSequence & Send
     private let downstream = AsyncPassthroughSequence<Element>()
     
     public init(isolation actor: isolated (any Actor)? = #isolation, upstream: Upstream) {
-        outer = upstream.sink(cancellation: .automatic) { [weak self] value in
+        outer = upstream.sink { [weak self] value in
             // Important: Do not capture self in here!
-            self?.cancellable = value.sink(cancellation: .automatic) { [weak self] value in
+            self?.cancellable = value.sink { [weak self] value in
                 self?.downstream.send(value)
             }
         }

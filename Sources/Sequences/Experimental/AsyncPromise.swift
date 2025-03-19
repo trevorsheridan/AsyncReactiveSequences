@@ -8,7 +8,7 @@
 import Foundation
 import Synchronization
 
-public final class AsyncPromise<Element: Sendable>: AsyncSequence, Sendable {
+public final class AsyncPromiseSequence<Element: Sendable>: AsyncSequence, Sendable {
     public enum Error: Swift.Error {
         case promiseAlreadyFulfilled
     }
@@ -79,7 +79,7 @@ public final class AsyncPromise<Element: Sendable>: AsyncSequence, Sendable {
     
     public struct Iterator: AsyncIteratorProtocol {
         let identifier = UUID()
-        let sequence: AsyncPromise<Element>
+        let sequence: AsyncPromiseSequence<Element>
         
         public func next() async throws -> Element? {
             try await sequence.next(iterator: identifier)

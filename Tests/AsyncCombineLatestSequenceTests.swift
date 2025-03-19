@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import ReactiveAsyncSequences
+@testable import AsyncReactiveSequences
 
 struct AsyncCombineLatestSequenceTests {
     @Test("Initial values from both AsyncCurrentValueSequences are returned from 2 sequences")

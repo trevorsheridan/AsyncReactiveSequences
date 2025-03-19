@@ -6,10 +6,10 @@
 //
 
 import Testing
-@testable import ReactiveAsyncSequences
+@testable import AsyncReactiveSequences
 
 struct AsyncFutureTests {
-    let promise = AsyncPromise<Int>()
+    let promise = AsyncPromiseSequence<Int>()
     
     enum Error: Swift.Error {
         case SomeFailure

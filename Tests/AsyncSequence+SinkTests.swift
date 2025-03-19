@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import ReactiveAsyncSequences
+@testable import AsyncReactiveSequences
 
 final class SinkTests {
     let sequence = AsyncCurrentValueSequence(0)
@@ -22,21 +22,21 @@ final class SinkTests {
             return try await s.compactMap { $0 }.collect(count: 3)
         }
         
-        sequence.sink(number: 1, cancellation: .automatic) { value in
+        sequence.sink(identifier: 1) { value in
             // noop
         } registration: { value in
             s.send(value)
         }
         .store(in: &cancellables)
         
-        sequence.sink(number: 2, cancellation: .automatic) { value in
+        sequence.sink(identifier: 2) { value in
             // noop
         } registration: { value in
             s.send(value)
         }
         .store(in: &cancellables)
         
-        sequence.sink(number: 3, cancellation: .automatic) { value in
+        sequence.sink(identifier: 3) { value in
             // noop
         } registration: { value in
             s.send(value)

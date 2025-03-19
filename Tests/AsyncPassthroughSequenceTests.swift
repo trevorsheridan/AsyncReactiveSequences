@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import ReactiveAsyncSequences
+@testable import AsyncReactiveSequences
 
 struct AsyncPassthroughSequenceTests {
     let sequence = AsyncPassthroughSequence<Int>()
