@@ -64,45 +64,76 @@ import os
 //    }
 //}
 
-public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, Sendable {
-    private let iterator: @Sendable () -> Iterator
-    
-    public init<Sequence: AsyncSequence & Sendable>(_ base: Sequence) where Sequence.Element == Element {
-        iterator = {
-            Iterator(iterator: base.makeAsyncIterator())
-        }
-    }
-    
-    public struct Iterator: AsyncIteratorProtocol {
-        let next: (isolated (any Actor)?) async throws -> Element?
-        
-        init<Iterator: AsyncIteratorProtocol>(iterator: Iterator) where Iterator.Element == Element {
-//            nonisolated(unsafe) var iterator = iterator
-            
-            self.next = { _ in
-                var iterator = iterator
-                
+//public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, Sendable {
+//    private let iterator: @Sendable () -> Iterator
+//    
+//    public init<Sequence: AsyncSequence & Sendable>(_ base: Sequence) where Sequence.Element == Element {
+//        iterator = {
+//            Iterator(iterator: base.makeAsyncIterator())
+//        }
+//    }
+//    
+//    public struct Iterator: AsyncIteratorProtocol {
+//        let next: (isolated (any Actor)?) async throws -> Element?
+//        
+//        init<Iterator: AsyncIteratorProtocol>(iterator: Iterator) where Iterator.Element == Element {
+////            nonisolated(unsafe) var iterator = iterator
+//            
+//            self.next = { actor in
+//                var iterator = iterator
+//                
 //                if let actor {
 //                    return try await iterator.next(isolation: actor)
 //                } else {
-                    return try await iterator.next()
+//                    return try await iterator.next()
 //                }
-            }
+//            }
+//        }
+//        
+//        public func next() async throws -> Element? {
+//            try await next(nil)
+//        }
+//        
+//        public func next(isolation actor: isolated (any Actor)? = #isolation) async throws(any Error) -> Element? {
+//            try await next(actor)
+//        }
+//    }
+//    
+//    public func makeAsyncIterator() -> Iterator {
+//        iterator()
+//    }
+//}
+
+public final class AnyAsyncSequence<Element>: AsyncSequence, Sendable where Element: Sendable {
+    private let sequence: any AsyncSequence & Sendable
+    
+        public init<Sequence: AsyncSequence>(_ base: Sequence) where Sequence.Element == Element, Sequence: Sendable {
+            self.sequence = base
+        }
+    
+    public struct Iterator: AsyncIteratorProtocol {
+        let iterator: any AsyncIteratorProtocol
+        
+        init(sequence: AnyAsyncSequence) {
+            self.iterator = sequence.sequence.makeAsyncIterator()
         }
         
         public func next() async throws -> Element? {
-            try await next(nil)
+            var iterator = iterator
+            return try await iterator.next() as! Element?
         }
         
-        public func next(isolation actor: isolated (any Actor)? = #isolation) async throws(any Error) -> Element? {
-            try await next(actor)
+        public func next(isolation actor: isolated (any Actor)? = #isolation) async throws -> Element? {
+            var iterator = iterator
+            return try await iterator.next(isolation: actor) as! Element?
         }
     }
     
     public func makeAsyncIterator() -> Iterator {
-        iterator()
+        Iterator(sequence: self)
     }
 }
+
 
 extension AsyncSequence {
     public func eraseToAnyAsyncSequence() -> AnyAsyncSequence<Element> where Self: Sendable {
