@@ -8,25 +8,36 @@
 import Synchronization
 import os
 
-public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, Sendable {
-//    private let iterator: @Sendable (_ isolation: (any Actor)?) async throws -> Element?
+public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, AsyncIteratorProtocol, Sendable {
+    private let iterator: @Sendable (_ isolation: (any Actor)?) async throws -> Element?
+//    private let sequence: Mutex<any AsyncSequence>
+    
+    public init<Sequence: AsyncSequence>(_ base: Sequence) where Sequence.Element == Element, Sequence: Sendable {
+        self.iterator = { actor in
+            var iterator = base.makeAsyncIterator()
+            return try await iterator.next(isolation: actor)
+        }
+    }
+    
+    public func next() async throws -> Element? {
+        try await iterator(#isolation)
+    }
+    
+    public func next(isolation actor: isolated (any Actor)?) async throws(any Error) -> Element? {
+        try await iterator(actor)
+    }
+    
+    public func makeAsyncIterator() -> AnyAsyncSequence<Element> {
+        self
+    }
+}
+
+public final class AnyAsyncSequence2<Element: Sendable>: AsyncSequence, Sendable {
     private let sequence: Mutex<any AsyncSequence>
     
     public init<Sequence: AsyncSequence>(_ base: Sequence) where Sequence.Element == Element, Sequence: Sendable {
-//        iterator = { @Sendable actor in
-//            var iterator = base.makeAsyncIterator()
-//            return try await iterator.next(isolation: actor)
-//        }
         self.sequence = .init(base)
     }
-    
-//    public func next() async throws -> Element? {
-//        try await iterator(#isolation)
-//    }
-//    
-//    public func next(isolation actor: isolated (any Actor)?) async throws(any Error) -> Element? {
-//        try await iterator(actor)
-//    }
     
     public func makeAsyncIterator() -> AnyAsyncIterator<Element> {
         sequence.withLock { sequence in
@@ -34,23 +45,6 @@ public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, Sendable 
         }
     }
 }
-
-//public actor IteratorProtector<Element: Sendable> {
-//    var iterator: any AsyncIteratorProtocol
-//    
-//    init(iterator: any AsyncIteratorProtocol) {
-//        self.iterator = iterator
-//    }
-//    
-//    public func withIterator() -> any AsyncIteratorProtocol {
-//
-//    }
-//    
-//    public func next(isolation actor: isolated (any Actor)?) async throws(any Error) -> Element? {
-//        var iterator = await iterator
-//        try await iterator.next(isolation: actor) as! Element?
-//    }
-//}
 
 public final class AnyAsyncIterator<Element: Sendable>: AsyncIteratorProtocol, @unchecked Sendable {
     private var iterator: any AsyncIteratorProtocol
