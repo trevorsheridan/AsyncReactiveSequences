@@ -5,9 +5,6 @@
 //  Created by Trevor Sheridan on 8/28/24.
 //
 
-import Synchronization
-import os
-
 public final class AnyAsyncSequence<Element>: AsyncSequence, Sendable where Element: Sendable {
     private let sequence: any AsyncSequence & Sendable
     
