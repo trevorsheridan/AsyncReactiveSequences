@@ -8,7 +8,7 @@
 import Synchronization
 import os
 
-public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, AsyncIteratorProtocol, Sendable {
+public final class AnyAsyncSequence2<Element: Sendable>: AsyncSequence, AsyncIteratorProtocol, Sendable {
     private let iterator: @Sendable (_ isolation: (any Actor)?) async throws -> Element?
 //    private let sequence: Mutex<any AsyncSequence>
     
@@ -27,12 +27,12 @@ public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, AsyncIter
         try await iterator(actor)
     }
     
-    public func makeAsyncIterator() -> AnyAsyncSequence<Element> {
+    public func makeAsyncIterator() -> AnyAsyncSequence2<Element> {
         self
     }
 }
 
-public final class AnyAsyncSequence2<Element: Sendable>: AsyncSequence, Sendable {
+public final class AnyAsyncSequence<Element: Sendable>: AsyncSequence, Sendable {
     private let sequence: Mutex<any AsyncSequence>
     
     public init<Sequence: AsyncSequence>(_ base: Sequence) where Sequence.Element == Element, Sequence: Sendable {
