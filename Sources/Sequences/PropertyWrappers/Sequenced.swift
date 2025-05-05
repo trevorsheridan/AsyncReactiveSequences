@@ -16,7 +16,7 @@ public final class Sequenced<Value>: Sendable where Value: Sendable {
         }
     }
     
-    public nonisolated(unsafe) var projectedValue: AsyncReadOnlyCurrentValueSequence<Value> {
+    public nonisolated var projectedValue: AsyncReadOnlyCurrentValueSequence<Value> {
         set {
             storage = newValue
         } get {
