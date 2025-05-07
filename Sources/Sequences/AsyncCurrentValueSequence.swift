@@ -104,11 +104,6 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
     private func resume(from buffer: ElementBuffer, sendingTo subscriber: Subscriber, loc: String) -> Subscriber {
         let (continuation, lastSeenElementIndex) = subscriber
         
-        guard let continuation else {
-            // Ensure we have a continuation to work with, otherwise simply send back the subscriber until it is capable of receiving values.
-            return subscriber
-        }
-        
         // The index of the element to consider resuming with.
         let index = if let lastSeenElementIndex { lastSeenElementIndex + 1 } else { buffer.keys.first }
         
@@ -117,10 +112,19 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
             return subscriber
         }
         
+        // Ensure we have a continuation to work with, otherwise simply send back the subscriber until it is capable of receiving values.
+        guard let continuation else {
+            return subscriber
+        }
+        
         // If this subscriber has never seen an index before, and we are to skip the initial element. Simply return the continuation for the next
         // iteration and set the `lastSeenElementIndex` on the subscriber to the current element's index. This will ensure that this subscriber
         // never receives this element.
         if lastSeenElementIndex == nil && skipInitialElement {
+            // If thre's another element in the buffer, skip this element but call resume and attempt to deliver that element.
+            if let _ = buffer[index + 1] {
+                return resume(from: buffer, sendingTo: (continuation, index), loc: loc)
+            }
             return (continuation, index)
         }
         
