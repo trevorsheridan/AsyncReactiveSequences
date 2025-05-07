@@ -112,8 +112,8 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
             return subscriber
         }
         
+        // Ensure we have a continuation to work with, otherwise simply send back the subscriber until it is capable of receiving values.
         guard let continuation else {
-            // Ensure we have a continuation to work with, otherwise simply send back the subscriber until it is capable of receiving values.
             return subscriber
         }
         
