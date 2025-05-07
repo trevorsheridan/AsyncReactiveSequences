@@ -20,7 +20,7 @@ where repeat each Upstream: AsyncSequence & Sendable, repeat (each Upstream).Ele
         observe(upstream: repeat each upstream)
     }
     
-    private func observe(upstream: repeat each Upstream) {
+    private func observe(isolation actor: isolated (any Actor)? = #isolation, upstream: repeat each Upstream) {
         var index = 0
         for sequence in repeat each upstream {
             obvserve(sequence: sequence, at: index).store(in: &cancellables)
@@ -28,10 +28,12 @@ where repeat each Upstream: AsyncSequence & Sendable, repeat (each Upstream).Ele
         }
     }
     
-    private func obvserve<Sequence>(sequence: Sequence, at index: Int) -> TaskCancellable where Sequence: AsyncSequence & Sendable, Sequence.Element: Sendable {
-        sequence.sink { [weak self] value in
-            self?.perform(with: value, index: index)
-        }
+    private func obvserve<Sequence>(isolation actor: isolated (any Actor)? = #isolation, sequence: Sequence, at index: Int) -> TaskCancellable where Sequence: AsyncSequence & Sendable, Sequence.Element: Sendable {
+        TaskCancellable(task: Task { [weak self] in
+            for try await value in sequence {
+                self?.perform(with: value, index: index)
+            }
+        }, mode: .automatic)
     }
     
     private func perform<V>(isolation actor: isolated (any Actor)? = #isolation, with value: V, index: Int) {
