@@ -12,7 +12,7 @@ public struct AsyncTimerSequence<C: Clock>: AsyncSequence {
     let tolerance: C.Duration?
     let clock: C
     
-    init(interval: C.Duration, tolerance: C.Duration? = nil, clock: C) {
+    public init(interval: C.Duration, tolerance: C.Duration? = nil, clock: C) {
         self.interval = interval
         self.tolerance = tolerance
         self.clock = clock
