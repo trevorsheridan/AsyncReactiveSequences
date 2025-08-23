@@ -5,7 +5,7 @@
 //  Created by Trevor Sheridan on 8/23/25.
 //
 
-public struct AsyncTimerSequence<C: Clock>: AsyncSequence {
+public struct AsyncTimerSequence<C: Clock>: AsyncSequence, Sendable {
     public typealias Element = C.Instant
     
     let interval: C.Duration
