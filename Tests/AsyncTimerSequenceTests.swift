@@ -1,5 +1,5 @@
 //
-//  AsyncCombineLatestSequenceTests 2.swift
+//  AsyncTimerSequenceTests.swift
 //  AsyncReactiveSequences
 //
 //  Created by Trevor Sheridan on 8/23/25.
