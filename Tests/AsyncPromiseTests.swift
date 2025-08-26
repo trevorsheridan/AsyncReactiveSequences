@@ -8,7 +8,7 @@
 import Testing
 @testable import AsyncReactiveSequences
 
-struct AsyncFutureTests {
+struct AsyncPromiseTests {
     let promise = AsyncPromiseSequence<Int>()
     
     enum Error: Swift.Error {
@@ -23,7 +23,7 @@ struct AsyncFutureTests {
         }
         
         let value = try await promise.first()
-        #expect(try await value == 100)
+        #expect(await value == 100)
     }
     
     @Test("Promise throws error when fulfilled with failure", .timeLimit(.minutes(1)))
