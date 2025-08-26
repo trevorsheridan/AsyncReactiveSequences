@@ -6,32 +6,34 @@
 //
 
 public final class AsyncLiftSequence<Element>: AsyncSequence, Sendable where Element: Sendable {
-    private let sequence = AsyncCurrentValueSequence<Element?>(nil)
+    private let task: Task<Element, Error>
     
     public init(element: sending @escaping () async throws -> Element) {
-        Task {
-            sequence.send(try await element())
+        task = Task {
+            try await element()
         }
     }
     
     public struct Iterator: AsyncIteratorProtocol {
-        let iterator: AsyncCurrentValueSequence<Element?>.AsyncIterator
+        let task: Task<Element, Error>
         var hasReturnedNext: Bool = false
         
-        init(sequence: AsyncCurrentValueSequence<Element?>.AsyncIterator) {
-            self.iterator = sequence.sequence.makeAsyncIterator()
+        init(task: Task<Element, Error>) {
+            self.task = task
         }
         
-        public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async -> Element? {
-            guard !hasReturnedNext, let next = await iterator.next(isolation: actor) else {
+        public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws -> Element? {
+            guard !hasReturnedNext else {
                 return nil
             }
+            
             defer { hasReturnedNext = true }
-            return next
+            
+            return try await task.value
         }
     }
     
     public func makeAsyncIterator() -> Iterator {
-        Iterator(sequence: sequence.makeAsyncIterator())
+        Iterator(task: task)
     }
 }

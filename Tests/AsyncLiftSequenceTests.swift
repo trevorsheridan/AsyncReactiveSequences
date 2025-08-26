@@ -10,8 +10,9 @@ import Testing
 
 struct AsyncLiftSequenceTests {
     let sequence = AsyncLiftSequence {
-        await Task {
-            100
+        try await Task {
+            try await Task.sleep(for: .seconds(1))
+            return 100
         }.value
     }
     
@@ -19,7 +20,7 @@ struct AsyncLiftSequenceTests {
     @MainActor
     func initialValue() async throws {
         var v: Int = 0
-        for await value in sequence {
+        for try await value in sequence {
             v = value
         }
         #expect(v == 100)
