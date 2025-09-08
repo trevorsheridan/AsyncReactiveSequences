@@ -24,6 +24,9 @@ let package = Package(
             dependencies: [
                 .product(name: "OrderedCollections", package: "swift-collections"),
                 .product(name: "Semaphore", package: "Semaphore")
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
         .testTarget(
