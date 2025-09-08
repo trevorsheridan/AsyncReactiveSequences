@@ -8,17 +8,17 @@
 import os
 
 extension AsyncSequence {
-    public func transform<E: Sendable>(@_inheritActorContext transform: @Sendable @escaping (_ notification: Element?) async -> E?) -> SendableAsyncSequence<E, Self> {
+    public func transform<E: Sendable>(transform: nonisolated(nonsending) @Sendable @escaping (_ notification: Element?) async -> E?) -> SendableAsyncSequence<E, Self> {
         SendableAsyncSequence(base: self, transform: transform)
     }
 }
 
-public final class SendableAsyncSequence<Element, Base>: AsyncSequence, Sendable where Element: Sendable, Base: AsyncSequence {
+public final class SendableAsyncSequence<Element, Base>: AsyncSequence, Sendable where Element: Sendable, Base: AsyncSequence, Base.Element: Sendable {
     private nonisolated(unsafe) let base: Base
     private let lock = OSAllocatedUnfairLock()
     private let transform: @Sendable (Base.Element?) async -> Element?
     
-    public init(base: Base, @_inheritActorContext transform: @Sendable @escaping (Base.Element?) async -> Element?) {
+    public init(base: Base, transform: nonisolated(nonsending) @Sendable @escaping (Base.Element?) async -> Element?) {
         self.base = base
         self.transform = transform
     }
@@ -27,7 +27,7 @@ public final class SendableAsyncSequence<Element, Base>: AsyncSequence, Sendable
         private var iterator: Base.AsyncIterator
         private let transform: (Base.Element?) async -> Element?
         
-        init(iterator: Base.AsyncIterator, @_inheritActorContext transform: @escaping (Base.Element?) async -> Element?) {
+        init(iterator: Base.AsyncIterator, transform: nonisolated(nonsending) @escaping (Base.Element?) async -> Element?) {
             self.iterator = iterator
             self.transform = transform
         }
