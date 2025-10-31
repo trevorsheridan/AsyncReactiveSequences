@@ -23,6 +23,10 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         state.withLock { $0.head.element }
     }
     
+    var subscribers: [UUID: Subscriber] {
+        state.withLock { $0.subscribers }
+    }
+    
     private let state: Mutex<State>
     private let skipInitialElement: Bool
     private let skipEmptyElements: Bool
@@ -141,6 +145,12 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         return (nil, index)
     }
     
+    func remove(iteratorIdentifier: UUID) {
+        state.withLock { state in
+            state.subscribers[iteratorIdentifier] = nil
+        }
+    }
+    
     private func cleanse(state: inout State) {
         state.buffer = state.buffer.reduce(into: [:]) { [weak self]  buffers, buffer in
             guard let self else {
@@ -171,12 +181,16 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         return fulfilledSubscribers != subscribers.count
     }
     
-    public struct Iterator: AsyncIteratorProtocol {
+    public class Iterator: AsyncIteratorProtocol {
         let identifier = UUID()
         let sequence: AsyncCurrentValueSequence
         
         init(sequence: AsyncCurrentValueSequence) {
             self.sequence = sequence
+        }
+        
+        deinit {
+            sequence.remove(iteratorIdentifier: identifier)
         }
         
         public func next() async -> Element? {

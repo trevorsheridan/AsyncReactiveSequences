@@ -8,6 +8,7 @@
 import Testing
 @testable import AsyncReactiveSequences
 
+@Suite
 struct AsyncCurrentValueSequenceTests {
     let sequence = AsyncCurrentValueSequence(0)
     
@@ -163,5 +164,17 @@ struct AsyncCurrentValueSequenceTests {
         
         #expect(valueString == "001")
     }
+    
+    // MARK: - Subscriber Management
+    
+    @Test
+    func unregisterSubscriberWhenForLoopExits() async throws {
+        #expect(try await sequence.subscribers.count == 0)
+        
+        for try await value in sequence {
+            break
+        }
+        
+        #expect(try await sequence.subscribers.count == 0)
+    }
 }
-
