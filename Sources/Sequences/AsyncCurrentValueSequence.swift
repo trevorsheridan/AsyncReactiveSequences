@@ -96,7 +96,7 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         }
     }
     
-    private func cancel(iteratorIdentifier: UUID) {
+    func cancel(iteratorIdentifier: UUID) {
         state.withLock { state in
             if let continuation = state.subscribers[iteratorIdentifier]?.continuation {
                 continuation.resume(returning: nil)
@@ -145,12 +145,6 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         return (nil, index)
     }
     
-    func remove(iteratorIdentifier: UUID) {
-        state.withLock { state in
-            state.subscribers[iteratorIdentifier] = nil
-        }
-    }
-    
     private func cleanse(state: inout State) {
         state.buffer = state.buffer.reduce(into: [:]) { [weak self]  buffers, buffer in
             guard let self else {
@@ -190,7 +184,7 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         }
         
         deinit {
-            sequence.remove(iteratorIdentifier: identifier)
+            sequence.cancel(iteratorIdentifier: identifier)
         }
         
         public func next() async -> Element? {
