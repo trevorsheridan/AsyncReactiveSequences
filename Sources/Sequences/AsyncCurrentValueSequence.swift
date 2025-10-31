@@ -175,7 +175,7 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         return fulfilledSubscribers != subscribers.count
     }
     
-    public class Iterator: AsyncIteratorProtocol {
+    public final class Iterator: AsyncIteratorProtocol {
         let identifier = UUID()
         let sequence: AsyncCurrentValueSequence
         
