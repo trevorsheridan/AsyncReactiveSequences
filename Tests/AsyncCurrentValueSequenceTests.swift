@@ -167,7 +167,7 @@ struct AsyncCurrentValueSequenceTests {
     
     // MARK: - Subscriber Management
     
-    @Test
+    @Test("Subscriber is unregistered when for loop exists")
     func unregisterSubscriberWhenForLoopExits() async throws {
         #expect(try await sequence.subscribers.count == 0)
         
