@@ -22,6 +22,10 @@ public final class AsyncLiftSequence<Element>: AsyncSequence, Sendable where Ele
             self.task = task
         }
         
+        public mutating func next() async throws -> Element? {
+            try await next(isolation: #isolation)
+        }
+        
         public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws -> Element? {
             guard !hasReturnedNext else {
                 return nil
