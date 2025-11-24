@@ -24,6 +24,10 @@ public struct AsyncTimerSequence<C: Clock>: AsyncSequence, Sendable {
         var clock: C
         var next: C.Instant
         
+        public mutating func next() async throws -> C.Instant? {
+            await next(isolation: #isolation)
+        }
+        
         public mutating func next(isolation actor: isolated (any Actor)?) async throws(Never) -> C.Instant? {
             guard !Task.isCancelled else {
                 return nil
