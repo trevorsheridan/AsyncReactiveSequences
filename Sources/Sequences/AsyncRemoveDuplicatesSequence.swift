@@ -66,13 +66,13 @@ where Element: Sendable, Failure: Error, S: AsyncSequence<Element, Failure> & Se
             }
         }
         
-        private func nextUniqueElement(iterator: inout S.AsyncIterator) async throws -> Element? {
+        private func nextUniqueElement(isolation actor: isolated (any Actor)? = #isolation, iterator: inout S.AsyncIterator) async throws -> Element? {
             while true {
                 guard !Task.isCancelled else {
                     return nil
                 }
                 
-                let next = try await iterator.next()
+                let next = try await iterator.next(isolation: actor)
                 let storedElement = state.withLock { element in element }
                 
                 guard let next, let storedElement else {
