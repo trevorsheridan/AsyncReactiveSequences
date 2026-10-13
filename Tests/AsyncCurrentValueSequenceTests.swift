@@ -177,4 +177,31 @@ struct AsyncCurrentValueSequenceTests {
         
         #expect(try await sequence.subscribers.count == 0)
     }
+    
+    // MARK: - Cancellation
+    
+    @Test("Cancelling an iterating task while values are sent to it doesn't deadlock", .timeLimit(.minutes(1)))
+    func cancellingWhileSendingDoesNotDeadlock() async throws {
+        for _ in 0..<2_000 {
+            let sequence = AsyncCurrentValueSequence(0)
+            
+            let iterating = Task.detached {
+                for await _ in sequence {}
+            }
+            
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for value in 1...20 {
+                        sequence.send(value)
+                    }
+                }
+                
+                group.addTask {
+                    iterating.cancel()
+                }
+            }
+            
+            await iterating.value
+        }
+    }
 }

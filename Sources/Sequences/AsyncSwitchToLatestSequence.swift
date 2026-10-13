@@ -14,7 +14,8 @@ where Upstream: AsyncSequence & Sendable, Upstream.Element: AsyncSequence & Send
     private nonisolated(unsafe) var cancellable: TaskCancellable?
     private nonisolated(unsafe) var outer: TaskCancellable!
     
-    private let downstream = AsyncPassthroughSequence<Element>()
+    // The upstream is subscribed at init, so an element can arrive before anyone iterates.
+    private let downstream = AsyncPassthroughSequence<Element>(deliversUnreceived: true)
     
     public init(isolation actor: isolated (any Actor)? = #isolation, upstream: Upstream) {
         outer = upstream.sink { [weak self] value in

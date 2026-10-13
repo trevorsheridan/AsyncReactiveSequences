@@ -12,11 +12,14 @@ import OrderedCollections
 public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, Sendable {
     typealias Subscriber = (continuation: CheckedContinuation<Element?, Never>?, lastElementIndex: Int?)
     typealias ElementBuffer = OrderedDictionary<Int, Element>
+    typealias Delivery = (continuation: CheckedContinuation<Element?, Never>, element: Element)
     
     private struct State: Sendable {
         var head: (element: Element, index: Int)
         var buffer: ElementBuffer = [:]
         var subscribers: [UUID: Subscriber] = [:]
+        // The seed at index 0 counts as delivered, so it's never handed to a subscriber that would otherwise skip it.
+        var lastDeliveredIndex = 0
     }
     
     public var value: Element {
@@ -30,16 +33,18 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
     private let state: Mutex<State>
     private let skipInitialElement: Bool
     private let skipEmptyElements: Bool
+    private let deliversUnreceived: Bool
     private let debug: Bool
     
     public convenience init(_ element: Element, debug: Bool = false) {
         self.init(element, skipInitialElement: false, skipEmptyElements: false, debug: debug)
     }
     
-    internal init(_ element: Element, skipInitialElement: Bool = false, skipEmptyElements: Bool = false, debug: Bool = false) {
+    internal init(_ element: Element, skipInitialElement: Bool = false, skipEmptyElements: Bool = false, deliversUnreceived: Bool = false, debug: Bool = false) {
         self.state = Mutex(.init(head: (element: element, index: 0), buffer: [0: element]))
         self.skipInitialElement = skipInitialElement
         self.skipEmptyElements = skipEmptyElements
+        self.deliversUnreceived = deliversUnreceived
         self.debug = debug
     }
     
@@ -48,10 +53,12 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
     }
     
     public func send(isolation: isolated (any Actor)? = #isolation, _ element: Element) {
-        state.withLock { [weak self] state in
+        let deliveries = state.withLock { [weak self] state -> [Delivery] in
             guard let self else {
-                return
+                return []
             }
+            
+            var deliveries: [Delivery] = []
             
             // Set the head element and cache it for delivery to iterators.
             state.head = (element, state.head.index + 1)
@@ -60,11 +67,15 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
             // Perform an iteration pass to any iterators awaiting a new value.
             state.subscribers = state.subscribers.reduce(into: [:]) { subscribers, subscriber in
                 // Peel the next item off for the iterator to consume.
-                subscribers[subscriber.key] = resume(from: state.buffer, sendingTo: subscriber.value, loc: "send")
+                subscribers[subscriber.key] = resume(from: state.buffer, sendingTo: subscriber.value, lastDeliveredIndex: &state.lastDeliveredIndex, deliveries: &deliveries, loc: "send")
             }
             
             cleanse(state: &state)
+            
+            return deliveries
         }
+        
+        deliver(deliveries)
     }
     
     private func next(isolation actor: isolated (any Actor)? = #isolation, iteratorIdentifier: UUID) async -> Element? {
@@ -84,12 +95,18 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
                     return
                 }
                 
-                state.withLock { state in
+                let deliveries = state.withLock { state -> [Delivery] in
+                    var deliveries: [Delivery] = []
+                    
                     // Craft a new subscriber with the newly received continuation and the previous subscriber's lastElementIndex.
                     let subscriber: Subscriber = (continuation, state.subscribers[iteratorIdentifier]?.lastElementIndex)
-                    state.subscribers[iteratorIdentifier] = resume(from: state.buffer, sendingTo: subscriber, loc: "next")
+                    state.subscribers[iteratorIdentifier] = resume(from: state.buffer, sendingTo: subscriber, lastDeliveredIndex: &state.lastDeliveredIndex, deliveries: &deliveries, loc: "next")
                     cleanse(state: &state)
+                    
+                    return deliveries
                 }
+                
+                deliver(deliveries)
             }
         } onCancel: { [weak self] in
             self?.cancel(iteratorIdentifier: iteratorIdentifier)
@@ -97,15 +114,22 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
     }
     
     func cancel(iteratorIdentifier: UUID) {
-        state.withLock { state in
-            if let continuation = state.subscribers[iteratorIdentifier]?.continuation {
-                continuation.resume(returning: nil)
-            }
-            state.subscribers[iteratorIdentifier] = nil
+        let continuation = state.withLock { state in
+            state.subscribers.removeValue(forKey: iteratorIdentifier)?.continuation
+        }
+        
+        continuation?.resume(returning: nil)
+    }
+    
+    // Continuations are resumed outside the lock. Resuming takes the waiting task's status lock, and the runtime holds that same lock while
+    // running a cancellation handler, which takes this lock in `cancel(iteratorIdentifier:)`. Resuming under the lock deadlocks the two.
+    private func deliver(_ deliveries: [Delivery]) {
+        for (continuation, element) in deliveries {
+            continuation.resume(returning: element)
         }
     }
     
-    private func resume(from buffer: ElementBuffer, sendingTo subscriber: Subscriber, loc: String) -> Subscriber {
+    private func resume(from buffer: ElementBuffer, sendingTo subscriber: Subscriber, lastDeliveredIndex: inout Int, deliveries: inout [Delivery], loc: String) -> Subscriber {
         let (continuation, lastSeenElementIndex) = subscriber
         
         // The index of the element to consider resuming with.
@@ -123,22 +147,23 @@ public final class AsyncCurrentValueSequence<Element: Sendable>: AsyncSequence, 
         
         // If this subscriber has never seen an index before, and we are to skip the initial element. Simply return the continuation for the next
         // iteration and set the `lastSeenElementIndex` on the subscriber to the current element's index. This will ensure that this subscriber
-        // never receives this element.
-        if lastSeenElementIndex == nil && skipInitialElement {
+        // never receives this element. With `deliversUnreceived`, an element no subscriber has received yet is delivered instead of skipped.
+        if lastSeenElementIndex == nil && skipInitialElement && (!deliversUnreceived || index <= lastDeliveredIndex) {
             // If thre's another element in the buffer, skip this element but call resume and attempt to deliver that element.
             if let _ = buffer[index + 1] {
-                return resume(from: buffer, sendingTo: (continuation, index), loc: loc)
+                return resume(from: buffer, sendingTo: (continuation, index), lastDeliveredIndex: &lastDeliveredIndex, deliveries: &deliveries, loc: loc)
             }
             return (continuation, index)
         }
         
         if skipEmptyElements && isNil(element) {
             // This element is nil, to skip it simply call resume() recursively with the index for this element.
-            return resume(from: buffer, sendingTo: (continuation, index), loc: loc)
+            return resume(from: buffer, sendingTo: (continuation, index), lastDeliveredIndex: &lastDeliveredIndex, deliveries: &deliveries, loc: loc)
         }
         
         // All conditions have been satisfied in order to send the element to the continuation.
-        continuation.resume(returning: element)
+        deliveries.append((continuation, element))
+        lastDeliveredIndex = Swift.max(lastDeliveredIndex, index)
         
         // Finally, return a new subscriber with a nil continuation (because a continuation may only receive a value once) and the current element's
         // set as the `lastSeenElementIndex` on the subscriber.
