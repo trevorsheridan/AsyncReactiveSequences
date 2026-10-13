@@ -9,9 +9,13 @@ import Foundation
 import Synchronization
 
 public final class AsyncPassthroughSequence<Element: Sendable>: AsyncSequence, Sendable {
-    private let currentValueSequence = AsyncCurrentValueSequence<Element?>(nil, skipInitialElement: true)
+    private let currentValueSequence: AsyncCurrentValueSequence<Element?>
     
-    public init() {}
+    /// - Parameter deliversUnreceived: When `true`, the latest element sent while no subscriber received it goes to the next subscriber.
+    ///   An element any subscriber has received is never replayed.
+    public init(deliversUnreceived: Bool = false) {
+        currentValueSequence = AsyncCurrentValueSequence<Element?>(nil, skipInitialElement: true, deliversUnreceived: deliversUnreceived)
+    }
     
     public func send(isolation: isolated (any Actor)? = #isolation) where Element == Void {
         send(())
