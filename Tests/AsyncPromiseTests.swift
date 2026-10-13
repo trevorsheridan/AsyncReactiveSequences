@@ -53,4 +53,27 @@ struct AsyncPromiseTests {
         
         try #require(v == 100)
     }
+    
+    @Test("Cancelling a waiting task while the promise is fulfilled doesn't deadlock", .timeLimit(.minutes(1)))
+    func cancellingWhileFulfillingDoesNotDeadlock() async throws {
+        for _ in 0..<2_000 {
+            let promise = AsyncPromiseSequence<Int>()
+            
+            let waiting = Task.detached {
+                try await promise.first()
+            }
+            
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try? promise.fulfill(.success(1))
+                }
+                
+                group.addTask {
+                    waiting.cancel()
+                }
+            }
+            
+            _ = try? await waiting.value
+        }
+    }
 }

@@ -36,22 +36,27 @@ public final class AsyncPromiseSequence<Element: Sendable>: AsyncSequence, Senda
     }
     
     public func fulfill(_ result: Result<Element, Swift.Error>) throws {
-        try state.withLock { state in
+        // Continuations are resumed outside the lock, because the cancellation handler below takes it while the runtime holds the task's
+        // status lock, which resuming also takes.
+        let continuations = try state.withLock { state in
             guard state.result == nil else {
                 throw Error.promiseAlreadyFulfilled
             }
             
             state.result = result
             
-            state.iterators = state.iterators.reduce(into: [:]) { iterators, iterator in
-                let (_, continuation) = iterator
-                
-                switch result {
-                case .success(let element):
-                    continuation.resume(returning: element)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
+            let continuations = Array(state.iterators.values)
+            state.iterators = [:]
+            
+            return continuations
+        }
+        
+        for continuation in continuations {
+            switch result {
+            case .success(let element):
+                continuation.resume(returning: element)
+            case .failure(let error):
+                continuation.resume(throwing: error)
             }
         }
     }
@@ -59,21 +64,24 @@ public final class AsyncPromiseSequence<Element: Sendable>: AsyncSequence, Senda
     private func next(iterator: UUID) async throws -> Element? {
         try await withTaskCancellationHandler {
             try await withUnsafeThrowingContinuation { continuation in
-                state.withLock { state in
+                let isFulfilled = state.withLock { state in
                     guard let _ = state.result else {
                         state.iterators[iterator] = continuation
-                        return
+                        return false
                     }
+                    return true
+                }
+                
+                if isFulfilled {
                     continuation.resume(returning: nil)
                 }
             }
         } onCancel: {
-            state.withLock { state in
-                if let continuation = state.iterators[iterator] {
-                    continuation.resume(returning: nil)
-                }
-                state.iterators[iterator] = nil
+            let continuation = state.withLock { state in
+                state.iterators.removeValue(forKey: iterator)
             }
+            
+            continuation?.resume(returning: nil)
         }
     }
     
