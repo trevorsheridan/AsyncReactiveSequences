@@ -15,6 +15,8 @@ public final class AsyncKVOSequence<Object, Element>: AsyncSequence, Sendable wh
     
     private nonisolated(unsafe) var observer: NSKeyValueObservation?
     private let sequence: AsyncCurrentValueSequence<Element>
+    // Held until deinit invalidates the observer, which can run off the main thread while the owner frees the object.
+    private nonisolated(unsafe) let object: Object
     
     /// Creates an `AsyncKVOSequence` that emits values in response to Key-Value Observing (KVO) changes.
     ///
@@ -29,6 +31,7 @@ public final class AsyncKVOSequence<Object, Element>: AsyncSequence, Sendable wh
     ///   - dispatching: Determines how the new value is retrieved when a change occurs. Defaults to `.change`.
     ///                  See discussion for details.
     public init(object: Object, keyPath: KeyPath<Object, Element>, dispatching: Dispatching = .change) {
+        self.object = object
         sequence = .init(object[keyPath: keyPath])
         
         observer = object.observe(keyPath, options: [.initial, .new]) { [sequence] object, change in
